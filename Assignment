@@ -1,0 +1,105 @@
+#Here I'm Using Flask API Service 
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+database = {
+    1: {'id': 1, 'name': 'Reach And Teach Learning Solutions Pvt Ltd'},
+    2: {'id': 2, 'name': 'Python Development'},
+    3: {'id': 3, 'name': 'My name Joyal kosti'}
+}
+
+# (Function to generate a unique ID for New Data)
+def generate_unique_id():
+    return max(database.keys()) + 1 if database else 1
+
+# (Retrievel of Data)
+@app.route('/data', methods=['GET'])
+def get_data():
+    return jsonify(list(database.values()))
+
+# (Store The Data)
+@app.route('/data', methods=['POST'])
+def store_data():
+    data = request.json
+    new_id = generate_unique_id()
+    data['id'] = new_id
+    database[new_id] = data
+    return jsonify({'Message': 'Your Data stored Successfully', 'id': new_id})
+
+# (Edit and Replace The Data)
+@app.route('/data/<int:data_id>', methods=['PUT'])
+def edit_data(data_id):
+    if data_id in database:
+        updated_data = request.json
+        updated_data['id'] = data_id
+        database[data_id] = updated_data
+        return jsonify({'Message': f'Your Data with ID {data_id} Updated Successfully'})
+    return jsonify({'Error': 'No Data found'})
+
+# (Delete The Data)
+@app.route('/data/<int:data_id>', methods=['DELETE'])
+def delete_data(data_id):
+    if data_id in database:
+        del database[data_id]
+        return jsonify({'Message': f'Your Data with ID {data_id} Deleted Successfully'})
+    return jsonify({'Error': 'No Data found'})
+
+# (Welcome To the Page and Get your Name)
+@app.route('/welcome', methods=['POST'])
+def welcome_and_store():
+    data = request.json
+    if 'name' in data:
+        new_id = generate_unique_id()
+        data['id'] = new_id
+        database[new_id] = data
+        return jsonify({'Message': f'Welcome, {data["You Can Provide your Name(My Name= Joyal Kosti)"]}! Your name has been stored with ID {new_id} in the database.'})
+    else:
+        return jsonify({'Error': 'Name not provided'})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+#For Serverless i'm use AWS lambda And API Gateway
+
+from flask import Flask, request, jsonify
+
+#Using BOTO3 Libraray for Interacting the AWS Service for Lambda Service(Function)
+import boto3
+
+app = Flask(__name__)
+#AWS Config
+COGNITO_REGION = 'Cognito_Region'
+USER_POOL_ID = 'User_ID'
+
+def verify_token(id_token):
+    client = boto3.client('cognito-idp', region_name=COGNITO_REGION)
+    try:
+        response = client.get_user(
+            AccessToken=id_token
+        )
+        return True  # If the token is valid
+    except:
+        return False  # If the token is invalid
+
+#Use of Authenticate for Protecting the End-point
+def authenticate_request():
+    id_token = request.headers.get('Authorization')
+    if id_token:
+        is_valid_token = verify_token(id_token)
+        if is_valid_token:
+            return True
+    return False
+
+
+#Here is the Example Protected Route
+@app.route('/protected', methods=['GET'])
+def protected_route():
+    if authenticate_request():
+        return jsonify({'Message': 'You are authorized to access this.'})
+    else:
+        return jsonify({'Error': 'You are NOT authorized'}), 401
+
+if __name__ == '__main__':
+    app.run(debug=True)
